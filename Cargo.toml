@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mp-core",
+    "crates/mp-barrier",
+    "crates/mp-adapters",
+    "crates/mp-daemon",
+    "crates/mp-operator",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Vicenzolinares23/manifold-plane"
+rust-version = "1.75"
+
+[workspace.dependencies]
+mp-core = { path = "crates/mp-core" }
+mp-barrier = { path = "crates/mp-barrier" }
+mp-adapters = { path = "crates/mp-adapters" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

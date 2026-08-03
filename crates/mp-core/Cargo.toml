@@ -1,0 +1,9 @@
+[package]
+name = "mp-core"
+description = "State space, metric geometry, and relaxation dynamics for manifold-plane. No dependencies by design."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
