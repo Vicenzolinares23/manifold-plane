@@ -1,0 +1,54 @@
+# manifold-plane agentic stack: Postgres + engine daemon + agent.
+#
+#   docker compose up -d postgres engine
+#   docker compose up agent            # build the agent image and run a demo
+#
+# `engine` runs the Rust mp-daemon. `agent` runs the LangGraph layer
+# (`agentic/`), which talks to Postgres and the engine and to Ollama
+# (expected at http://localhost:11434 from the host network).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: manifold
+      POSTGRES_PASSWORD: manifold
+      POSTGRES_DB: manifold_plane
+    ports:
+      - "5432:5432"
+    volumes:
+      - manifold_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manifold -d manifold_plane"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  engine:
+    build:
+      context: .
+      dockerfile: docker/engine.Dockerfile
+    ports:
+      - "8787:8787"
+    environment:
+      MP_ENGINE_ADDR: "0.0.0.0:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+    environment:
+      MP_ENGINE_URL: "http://engine:8787"
+      MP_DATABASE_URL: "postgresql+psycopg://manifold:manifold@postgres:5432/manifold_plane"
+      MP_LLM_BASE_URL: "http://host.docker.internal:11434/v1"
+      MP_LLM_MODEL: "phi4:14b"
+    depends_on:
+      engine:
+        condition: service_started
+    command: ["python", "-m", "manifold_agent.examples.demo_agent"]
+
+volumes:
+  manifold_pgdata:
