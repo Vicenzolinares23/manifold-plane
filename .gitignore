@@ -16,3 +16,5 @@ agentic/models/
 *.png
 !docs/img/*.png
 .DS_Store
+
+.worktrees/
