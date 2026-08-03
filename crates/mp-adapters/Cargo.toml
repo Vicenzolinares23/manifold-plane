@@ -1,8 +1,10 @@
 [package]
 name = "mp-adapters"
+description = "Domain adapters mapping Kubernetes, ICS, and LLM agent requests to capability displacements."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
+mp-core = { workspace = true }
