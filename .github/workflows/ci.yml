@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: format
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --all-targets --all-features
+      - name: test
+        run: cargo test --all
+      - name: build release
+        run: cargo build --release -p mp-daemon
+
+  # The independent validation. Runs on a bare interpreter with no install,
+  # which is the point — a validation suite nobody can run is not validation.
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: dimensional, calibration, and adversarial checks
+        run: python3 sim/run_all.py
+
+  # The safety theorems are the product. If a change breaks forward invariance
+  # or the adversary bound, that is not a failing test, it is a failing claim —
+  # so they get their own job rather than hiding among the unit tests.
+  theorems:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: T1 forward invariance, T2 adversary bound, T4 envelope
+        run: cargo test --release -p mp-barrier -- --nocapture t1_ t2_ t4_
+      - name: Lyapunov feasibility (T5)
+        run: cargo test --release -p mp-core -- metric::
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: build daemon image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
