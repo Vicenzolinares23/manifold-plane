@@ -1,0 +1,13 @@
+/target
+**/target
+Cargo.lock
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+sim/out/
+*.png
+!docs/img/*.png
+.DS_Store
