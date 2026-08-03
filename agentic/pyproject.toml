@@ -54,3 +54,6 @@ include = ["manifold_agent*"]
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
+markers = [
+    "db: tests that require a live Postgres",
+]

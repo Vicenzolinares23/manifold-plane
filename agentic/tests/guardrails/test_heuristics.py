@@ -20,5 +20,5 @@ def test_input_blocks_jailbreak():
 
 
 def test_output_flags_api_key():
-    r = check_output("token=sk-abcdefghijklmnopqrstuvwxyz123456")
+    r = check_output("api_key=mp_test_key_abcdefghijklmnopqrstuvwxyz123456")
     assert r.allowed is False
