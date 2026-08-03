@@ -109,6 +109,22 @@ theory to 0.24%. Logarithmic, not polynomial. Had it come out otherwise the
 formulation would have been wrong, and `docs/03` said so in advance rather than
 leaving it to be explained away.
 
+## Cost
+
+Measured by `cargo bench -p mp-barrier`:
+
+| | |
+|---|---|
+| barrier kernel alone | 38 ns |
+| full decision, no peers | 270 ns |
+| full decision, 20 peers in class | 1.7 µs |
+| full decision, 2000 peers in class | 138 µs |
+
+The orbit residual takes a median and a MAD over the whole symmetry class on
+every decision, so it is `O(peers)` and dominates past ~20 members. That is a
+real limitation, not fixed here; the fix is caching the class median between
+decisions rather than dropping the detector, which is half the system's value.
+
 ## Run it
 
 ```bash
