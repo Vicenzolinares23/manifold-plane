@@ -173,3 +173,74 @@ Stated in advance, because a model that cannot be falsified is not doing work:
 
 None of the three is ruled out by anything in this repository. They are ruled out
 or in by data from a real deployment, which is the next piece of work.
+
+---
+
+## Findings from implementation
+
+F1–F7 came from the derivation. These two came from running it, and both were
+invisible until a metric was fit from actual data — the identity metric used
+during development hid them completely. That is worth noting on its own: a
+security control validated only against its own defaults is validated against
+the case that cannot fail.
+
+### F8 — Iterative Lyapunov projection is numerically unusable — **FIXED**
+
+*Found by:* `sim/calibration.py` on the first fitted metric.
+
+`docs/05` §5.6 specified enforcing `ΛM + MΛ ⪰ 0` by alternating projections,
+mapping through `L⁻¹`. `L⁻¹` scales entry `(i,j)` by `1/(λᵢ+λⱼ)`. With
+half-lives spanning nine orders (`docs/03`), the slow-slow denominator is about
+`4×10⁻¹³`, so the map amplifies by `~10¹²`. The result was a calibrated budget of
+`c = 3.1×10⁸ bits²` and a diagonal condition number of `3.9×10⁸` — arithmetically
+valid, geometrically meaningless, and no operator could reason about it.
+
+The irony is exact: the nine-order spread that *justifies* a vector state
+(`docs/01` I2) is what breaks the projection that keeps the vector state safe.
+
+*Rejected first fix.* Bisecting a single global damping factor toward the
+diagonal. Stable, and far too blunt — it crushed the authority–reach correlation,
+which was never the problem, along with the irreversibility coupling, which was.
+It left `M[a][h] = −0.007` and a near-isotropic geometry, discarding exactly the
+structure `docs/04` identifies as carrying the escalation signal. Worth recording
+because it *passed* every check that existed at the time; the checks were what
+had to improve.
+
+*Fix.* Closed form, single pass. Damp entry `(i,j)` by the ratio of the geometric
+to the arithmetic mean of its two rates:
+
+    C[i][j] = 2·√(λᵢλⱼ) / (λᵢ + λⱼ),     M' = M ∘ C
+
+Then `ΛM' + M'Λ = 2·Λ^½ M Λ^½`, PSD by congruence; and `M' ⪰ 0` because `C` is a
+Hadamard product of the rank-one kernel `√λᵢ√λⱼ` with the Cauchy kernel
+`1/(λᵢ+λⱼ)`, both PSD, so Schur's product theorem applies.
+
+**It also says something true rather than merely being convenient.** `C` is unity
+on the diagonal and shrinks with rate disparity, so *an axis that never decays
+cannot stay correlated with a fast one*. That is the actual content of the
+Lyapunov condition, and it was not visible in the algebra of §5.6. Authority and
+reach (rates within 4×) retain ~0.8 of their fitted correlation; irreversibility
+and tempo (nine orders apart) are decorrelated entirely.
+
+Post-fix calibration: `c = 111 bits²`, anisotropy 83×, and moving against the
+benign authority–reach correlation costs 6× moving along it.
+
+### F9 — Tail-sparse axes explode the inverse covariance — **FIXED**
+
+Irreversibility is exactly zero for ~92% of benign requests. Its sample variance
+approaches zero, and `M = Cov⁻¹` then assigns it an enormous eigenvalue. Ledoit–
+Wolf shrinkage does not rescue this: the computed intensity was `γ = 0.0014`,
+correctly small for a well-sampled covariance and useless against a near-
+degenerate axis.
+
+*Fix, and it is dimensional rather than numerical.* Every axis is a log-ratio of
+counted things (`docs/03`), and counts have finite resolution — you cannot
+resolve a displacement smaller than the smallest countable change. So the
+covariance cannot legitimately be below the measurement quantum, and flooring the
+diagonal at `(0.01 bits)²` is a statement about the instrument, not a
+regularization knob. It therefore does not violate the no-constant-without-a-
+procedure rule: the procedure is "measure your telemetry's resolution."
+
+*Open residual.* The floor is currently a compiled-in default rather than a
+measured per-deployment quantity. It should be derived from the actual counting
+resolution of the telemetry source. Small, and real.
