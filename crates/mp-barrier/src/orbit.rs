@@ -34,7 +34,12 @@ pub struct OrbitResidual {
 impl OrbitResidual {
     /// Neutral residual, used when a group is too small to say anything.
     pub fn none() -> Self {
-        OrbitResidual { distance: 0.0, spread: 0.0, ratio: 0.0, peers: 0 }
+        OrbitResidual {
+            distance: 0.0,
+            spread: 0.0,
+            ratio: 0.0,
+            peers: 0,
+        }
     }
 }
 
@@ -94,10 +99,23 @@ pub fn residual(metric: &Metric, subject: &Vec6, peers: &[Vec6]) -> OrbitResidua
     // infinitely many "spreads" away, which would deny on the first bit of
     // legitimate variation. Floor the denominator at a small fraction of the
     // distance scale so a uniform group yields a large but finite ratio.
-    let denom = if spread > 1e-9 { spread } else { 1e-9_f64.max(distance * 1e-3) };
-    let ratio = if distance > 0.0 { distance / denom } else { 0.0 };
+    let denom = if spread > 1e-9 {
+        spread
+    } else {
+        1e-9_f64.max(distance * 1e-3)
+    };
+    let ratio = if distance > 0.0 {
+        distance / denom
+    } else {
+        0.0
+    };
 
-    OrbitResidual { distance, spread, ratio, peers: peers.len() }
+    OrbitResidual {
+        distance,
+        spread,
+        ratio,
+        peers: peers.len(),
+    }
 }
 
 #[cfg(test)]
@@ -147,7 +165,11 @@ mod tests {
         let compromised = residual(&m, &v(500.0), &peers);
 
         assert!(honest.ratio < compromised.ratio / 100.0);
-        assert!(honest.distance < 1.0, "honest member dragged to {}", honest.distance);
+        assert!(
+            honest.distance < 1.0,
+            "honest member dragged to {}",
+            honest.distance
+        );
     }
 
     #[test]

@@ -29,10 +29,18 @@ pub struct Response {
 
 impl Response {
     pub fn json(status: u16, body: impl Into<Vec<u8>>) -> Self {
-        Response { status, content_type: "application/json", body: body.into() }
+        Response {
+            status,
+            content_type: "application/json",
+            body: body.into(),
+        }
     }
     pub fn text(status: u16, body: impl Into<Vec<u8>>) -> Self {
-        Response { status, content_type: "text/plain; charset=utf-8", body: body.into() }
+        Response {
+            status,
+            content_type: "text/plain; charset=utf-8",
+            body: body.into(),
+        }
     }
     pub fn not_found() -> Self {
         Response::text(404, "not found\n")
@@ -117,7 +125,12 @@ fn write_response(stream: &mut TcpStream, r: &Response) {
 /// One thread per connection, capped. Fine for admission-webhook traffic, which
 /// is low-rate by nature — the Kubernetes API server does not fan out thousands
 /// of concurrent admission reviews.
-pub fn serve<F>(listen: &str, max_body: usize, max_threads: usize, handler: F) -> std::io::Result<()>
+pub fn serve<F>(
+    listen: &str,
+    max_body: usize,
+    max_threads: usize,
+    handler: F,
+) -> std::io::Result<()>
 where
     F: Fn(Request) -> Response + Send + Sync + 'static,
 {
@@ -191,7 +204,8 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         let mut s = std::net::TcpStream::connect(addr).unwrap();
-        s.write_all(b"GET /healthz HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n").unwrap();
+        s.write_all(b"GET /healthz HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n")
+            .unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("200 OK"), "got: {out}");
@@ -209,7 +223,8 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         let mut s = std::net::TcpStream::connect(addr).unwrap();
-        s.write_all(b"POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 99999\r\n\r\n").unwrap();
+        s.write_all(b"POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: 99999\r\n\r\n")
+            .unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("413"), "got: {out}");

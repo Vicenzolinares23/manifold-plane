@@ -193,23 +193,32 @@ mod tests {
     fn alpha_is_derived_and_honours_the_step_requirement() {
         // The whole point of stating min_steps rather than alpha: the derived
         // alpha should actually deliver the requested number of steps.
-        let mut c = Config::default();
-        c.min_steps_to_boundary = 500.0;
-        c.approach_fraction = 0.99;
+        let c = Config {
+            min_steps_to_boundary: 500.0,
+            approach_fraction: 0.99,
+            ..Default::default()
+        };
         let alpha = c.alpha();
 
         let h0 = c.budget_bits_squared;
         let h_target = c.budget_bits_squared * 0.01;
         let steps = (h_target / h0).ln() / (1.0 - alpha).ln();
-        assert!((steps - 500.0).abs() < 1.0, "derived alpha gives {steps} steps, wanted 500");
+        assert!(
+            (steps - 500.0).abs() < 1.0,
+            "derived alpha gives {steps} steps, wanted 500"
+        );
     }
 
     #[test]
     fn demanding_more_steps_yields_a_smaller_alpha() {
-        let mut slow = Config::default();
-        slow.min_steps_to_boundary = 10_000.0;
-        let mut fast = Config::default();
-        fast.min_steps_to_boundary = 10.0;
+        let slow = Config {
+            min_steps_to_boundary: 10_000.0,
+            ..Default::default()
+        };
+        let fast = Config {
+            min_steps_to_boundary: 10.0,
+            ..Default::default()
+        };
         assert!(slow.alpha() < fast.alpha());
     }
 
@@ -221,7 +230,10 @@ mod tests {
 
     #[test]
     fn fail_open_warns() {
-        let c = Config { fail_open: true, ..Default::default() };
+        let c = Config {
+            fail_open: true,
+            ..Default::default()
+        };
         assert!(c.warnings().iter().any(|w| w.0.contains("fail_open")));
     }
 
@@ -232,7 +244,11 @@ mod tests {
             half_lives_secs: Some([30.0, 300.0, 3600.0, 43200.0, 172800.0, 3.15e12]),
             ..Default::default()
         };
-        assert!(c.warnings().is_empty(), "unexpected warnings: {:?}", c.warnings());
+        assert!(
+            c.warnings().is_empty(),
+            "unexpected warnings: {:?}",
+            c.warnings()
+        );
     }
 
     #[test]
@@ -254,9 +270,15 @@ mod tests {
 
     #[test]
     fn invalid_values_are_rejected() {
-        let c = Config { approach_fraction: 1.5, ..Default::default() };
+        let c = Config {
+            approach_fraction: 1.5,
+            ..Default::default()
+        };
         assert!(c.validate().is_err());
-        let c = Config { budget_bits_squared: -1.0, ..Default::default() };
+        let c = Config {
+            budget_bits_squared: -1.0,
+            ..Default::default()
+        };
         assert!(c.validate().is_err());
     }
 }

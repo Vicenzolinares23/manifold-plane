@@ -133,7 +133,9 @@ mod tests {
             approach_fraction: 0.99,
             symmetry_classes: vec![SymmetryClassSpec {
                 name: "controllers".into(),
-                selector: [("app".to_string(), "ctrl".to_string())].into_iter().collect(),
+                selector: [("app".to_string(), "ctrl".to_string())]
+                    .into_iter()
+                    .collect(),
             }],
             calibration_config_map: Some("mp-calibration".into()),
             max_budget_drift: 0.25,
@@ -181,9 +183,10 @@ mod tests {
 
     #[test]
     fn unknown_spec_fields_are_rejected() {
-        let r: Result<PolicySpec, _> =
-            serde_json::from_str(r#"{"domain":"kubernetes","minStepsToBoundary":10,
-                "symmetryClasses":[],"alpha":0.9}"#);
+        let r: Result<PolicySpec, _> = serde_json::from_str(
+            r#"{"domain":"kubernetes","minStepsToBoundary":10,
+                "symmetryClasses":[],"alpha":0.9}"#,
+        );
         assert!(r.is_err(), "alpha must not be silently accepted");
     }
 
@@ -192,7 +195,11 @@ mod tests {
         let p = ManifoldPolicy {
             api_version: api_version(),
             kind: kind(),
-            metadata: Metadata { name: "p".into(), namespace: None, generation: 3 },
+            metadata: Metadata {
+                name: "p".into(),
+                namespace: None,
+                generation: 3,
+            },
             spec: spec(),
             status: None,
         };

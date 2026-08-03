@@ -34,10 +34,16 @@ impl std::fmt::Display for MetricError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MetricError::SingularCovariance => {
-                write!(f, "benign covariance is singular; calibration corpus lacks variation")
+                write!(
+                    f,
+                    "benign covariance is singular; calibration corpus lacks variation"
+                )
             }
             MetricError::InfeasibleProjection { residual } => {
-                write!(f, "metric feasibility projection failed, residual {residual:.3e}")
+                write!(
+                    f,
+                    "metric feasibility projection failed, residual {residual:.3e}"
+                )
             }
             MetricError::InsufficientSamples { got, need } => {
                 write!(f, "need at least {need} calibration samples, got {got}")
@@ -68,7 +74,10 @@ impl Metric {
     /// Identity metric. Only for tests and bootstrapping — it asserts all six
     /// axes are interchangeable and uncorrelated, which `docs/02` N1 rejects.
     pub fn identity() -> Self {
-        Metric { m: linalg::identity(), projection_distance: 0.0 }
+        Metric {
+            m: linalg::identity(),
+            projection_distance: 0.0,
+        }
     }
 
     /// Build from a raw matrix, enforcing positive-definiteness and the
@@ -81,7 +90,10 @@ impl Metric {
         if residual > 1e-6 || min_eigenvalue(&feasible) <= 0.0 {
             return Err(MetricError::InfeasibleProjection { residual });
         }
-        Ok(Metric { m: feasible, projection_distance: dist })
+        Ok(Metric {
+            m: feasible,
+            projection_distance: dist,
+        })
     }
 
     pub fn as_matrix(&self) -> &Mat6 {
@@ -134,13 +146,22 @@ pub fn lyapunov(m: &Mat6, rates: &Vec6) -> Mat6 {
     symmetrize(&out)
 }
 
-/// Inverse of the Lyapunov operator.
-fn lyapunov_inv(s: &Mat6, rates: &Vec6) -> Mat6 {
+/// Inverse of the Lyapunov operator, `L⁻¹(S)[i][j] = S[i][j] / (λᵢ + λⱼ)`.
+///
+/// Kept for diagnostics and not used by `project_feasible`. It is retained
+/// precisely because its conditioning is the finding: with half-lives spanning
+/// nine orders, the slow-slow denominator is ~4e-13 and this map amplifies by
+/// ~10¹². Anything reaching for it should see that first.
+pub fn lyapunov_inv(s: &Mat6, rates: &Vec6) -> Mat6 {
     let mut out = [[0.0; N]; N];
     for i in 0..N {
         for j in 0..N {
             let denom = rates[i] + rates[j];
-            out[i][j] = if denom.abs() > 1e-300 { s[i][j] / denom } else { 0.0 };
+            out[i][j] = if denom.abs() > 1e-300 {
+                s[i][j] / denom
+            } else {
+                0.0
+            };
         }
     }
     symmetrize(&out)
@@ -232,7 +253,10 @@ pub fn damping_matrix(rates: &Vec6) -> Mat6 {
 /// Sample covariance of benign displacement vectors.
 pub fn covariance(samples: &[Vec6]) -> Result<Mat6, MetricError> {
     if samples.len() <= N {
-        return Err(MetricError::InsufficientSamples { got: samples.len(), need: N + 1 });
+        return Err(MetricError::InsufficientSamples {
+            got: samples.len(),
+            need: N + 1,
+        });
     }
     let n = samples.len() as f64;
 
@@ -406,7 +430,10 @@ mod tests {
             relaxation_increases_potential(&m, &r, &z, std::f64::consts::LN_2),
             "the counterexample in docs/05 should reproduce"
         );
-        assert!(!is_psd(&lyapunov(&m, &r)), "and it should be Lyapunov-infeasible");
+        assert!(
+            !is_psd(&lyapunov(&m, &r)),
+            "and it should be Lyapunov-infeasible"
+        );
     }
 
     #[test]
@@ -420,8 +447,14 @@ mod tests {
 
         let (fixed, dist) = project_feasible(&m, &r);
         assert!(dist > 0.0, "projection should have moved the matrix");
-        assert!(is_psd(&lyapunov(&fixed, &r)), "result must be Lyapunov-feasible");
-        assert!(min_eigenvalue(&fixed) > 0.0, "result must stay positive definite");
+        assert!(
+            is_psd(&lyapunov(&fixed, &r)),
+            "result must be Lyapunov-feasible"
+        );
+        assert!(
+            min_eigenvalue(&fixed) > 0.0,
+            "result must stay positive definite"
+        );
     }
 
     #[test]
@@ -438,7 +471,10 @@ mod tests {
     #[test]
     fn covariance_rejects_too_few_samples() {
         let s = vec![[0.0; N]; 3];
-        assert!(matches!(covariance(&s), Err(MetricError::InsufficientSamples { .. })));
+        assert!(matches!(
+            covariance(&s),
+            Err(MetricError::InsufficientSamples { .. })
+        ));
     }
 
     #[test]
@@ -456,7 +492,10 @@ mod tests {
         let it = c[Axis::Irreversibility.index()][Axis::Tempo.index()];
 
         assert!(ah > 0.7, "authority-reach correlation over-damped: {ah}");
-        assert!(it < 1e-4, "irreversibility-tempo correlation under-damped: {it}");
+        assert!(
+            it < 1e-4,
+            "irreversibility-tempo correlation under-damped: {it}"
+        );
         for i in 0..N {
             assert!((c[i][i] - 1.0).abs() < 1e-12, "diagonal must be unity");
         }

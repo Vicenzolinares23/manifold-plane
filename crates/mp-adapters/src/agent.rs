@@ -84,7 +84,9 @@ pub struct AgentAdapter {
 
 impl AgentAdapter {
     pub fn new() -> Self {
-        AgentAdapter { max_disclosure_bits: 20.0 }
+        AgentAdapter {
+            max_disclosure_bits: 20.0,
+        }
     }
 }
 
@@ -97,7 +99,11 @@ impl Adapter for AgentAdapter {
 
     fn displacement(&self, c: &ToolCall, current: &Vec6) -> Displacement {
         let mut d = Displacement::zero();
-        let cap = if self.max_disclosure_bits > 0.0 { self.max_disclosure_bits } else { 20.0 };
+        let cap = if self.max_disclosure_bits > 0.0 {
+            self.max_disclosure_bits
+        } else {
+            20.0
+        };
 
         match c.kind {
             ToolKind::ReadLocal => {
@@ -109,7 +115,9 @@ impl Adapter for AgentAdapter {
                 d = d.with(Axis::Reach, 1.0).with(Axis::Authority, 0.1);
             }
             ToolKind::WriteLocal => {
-                d = d.with(Axis::Authority, 0.5).with(Axis::Irreversibility, 6.0);
+                d = d
+                    .with(Axis::Authority, 0.5)
+                    .with(Axis::Irreversibility, 6.0);
             }
             ToolKind::SendExternal => {
                 // Disclosure is irreversible: the recipient's knowledge cannot
@@ -118,7 +126,9 @@ impl Adapter for AgentAdapter {
                 let payload_bits = (c.payload_bytes as f64 * c.source_sensitivity).max(1.0);
                 let disclosure =
                     irreversibility_bits(payload_bits * c.recipients.max(1) as f64).min(cap);
-                d = d.with(Axis::Irreversibility, disclosure).with(Axis::Reach, 2.0);
+                d = d
+                    .with(Axis::Irreversibility, disclosure)
+                    .with(Axis::Reach, 2.0);
             }
             ToolKind::Execute => {
                 d = d
@@ -165,7 +175,10 @@ mod tests {
     use mp_core::linalg::N;
 
     fn call(kind: ToolKind) -> ToolCall {
-        ToolCall { kind, ..Default::default() }
+        ToolCall {
+            kind,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -185,7 +198,10 @@ mod tests {
             source_sensitivity: 1.0,
             ..Default::default()
         };
-        let large = ToolCall { payload_bytes: 10_000_000, ..small.clone() };
+        let large = ToolCall {
+            payload_bytes: 10_000_000,
+            ..small.clone()
+        };
         assert!(
             a.displacement(&large, &[0.0; N]).get(Axis::Irreversibility)
                 > a.displacement(&small, &[0.0; N]).get(Axis::Irreversibility)
@@ -202,7 +218,10 @@ mod tests {
             source_sensitivity: 1.0,
             ..Default::default()
         };
-        let many = ToolCall { recipients: 5000, ..one.clone() };
+        let many = ToolCall {
+            recipients: 5000,
+            ..one.clone()
+        };
         assert!(
             a.displacement(&many, &[0.0; N]).get(Axis::Irreversibility)
                 > a.displacement(&one, &[0.0; N]).get(Axis::Irreversibility)
@@ -220,7 +239,10 @@ mod tests {
             recipients: 1,
             ..Default::default()
         };
-        let tainted = ToolCall { argument_tainted: true, ..clean.clone() };
+        let tainted = ToolCall {
+            argument_tainted: true,
+            ..clean.clone()
+        };
         let c = a.displacement(&clean, &[0.0; N]);
         let t = a.displacement(&tainted, &[0.0; N]);
         assert!(t.get(Axis::Authority) > c.get(Axis::Authority) + 2.0);
@@ -232,7 +254,11 @@ mod tests {
         // A tainted local read is not the same event as a tainted outbound
         // send. The multiplier distinguishes them.
         let a = AgentAdapter::new();
-        let read = ToolCall { kind: ToolKind::ReadLocal, argument_tainted: true, ..Default::default() };
+        let read = ToolCall {
+            kind: ToolKind::ReadLocal,
+            argument_tainted: true,
+            ..Default::default()
+        };
         let send = ToolCall {
             kind: ToolKind::SendExternal,
             argument_tainted: true,
@@ -284,15 +310,24 @@ mod tests {
     fn self_modification_is_the_most_authority_expensive_step() {
         let a = AgentAdapter::new();
         let sm = a.displacement(&call(ToolKind::SelfModify), &[0.0; N]);
-        for k in [ToolKind::ReadLocal, ToolKind::ReadExternal, ToolKind::WriteLocal] {
-            assert!(sm.get(Axis::Authority) > a.displacement(&call(k), &[0.0; N]).get(Axis::Authority));
+        for k in [
+            ToolKind::ReadLocal,
+            ToolKind::ReadExternal,
+            ToolKind::WriteLocal,
+        ] {
+            assert!(
+                sm.get(Axis::Authority) > a.displacement(&call(k), &[0.0; N]).get(Axis::Authority)
+            );
         }
     }
 
     #[test]
     fn off_transcript_calls_register_as_opacity() {
         let a = AgentAdapter::new();
-        let c = ToolCall { off_transcript: true, ..call(ToolKind::Execute) };
+        let c = ToolCall {
+            off_transcript: true,
+            ..call(ToolKind::Execute)
+        };
         assert!(a.displacement(&c, &[0.0; N]).get(Axis::Opacity) > 3.0);
     }
 }

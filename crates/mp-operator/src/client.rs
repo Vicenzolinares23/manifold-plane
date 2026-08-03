@@ -30,9 +30,17 @@ impl std::error::Error for ClusterError {}
 /// required RBAC stays visibly small.
 pub trait ClusterClient {
     /// Read a ConfigMap's data.
-    fn get_config_map(&self, ns: &str, name: &str) -> Result<BTreeMap<String, String>, ClusterError>;
+    fn get_config_map(
+        &self,
+        ns: &str,
+        name: &str,
+    ) -> Result<BTreeMap<String, String>, ClusterError>;
     /// Count objects matching a label selector, for symmetry class sizing.
-    fn count_matching(&self, ns: &str, selector: &BTreeMap<String, String>) -> Result<usize, ClusterError>;
+    fn count_matching(
+        &self,
+        ns: &str,
+        selector: &BTreeMap<String, String>,
+    ) -> Result<usize, ClusterError>;
     /// Write back a policy's status subresource.
     fn patch_status(&self, ns: &str, name: &str, status_json: &str) -> Result<(), ClusterError>;
 }
@@ -49,7 +57,11 @@ impl ProxyClient {
 }
 
 impl ClusterClient for ProxyClient {
-    fn get_config_map(&self, ns: &str, name: &str) -> Result<BTreeMap<String, String>, ClusterError> {
+    fn get_config_map(
+        &self,
+        ns: &str,
+        name: &str,
+    ) -> Result<BTreeMap<String, String>, ClusterError> {
         Err(ClusterError::Transport(format!(
             "ProxyClient is a transport stub: GET {}/api/v1/namespaces/{ns}/configmaps/{name}. \
              Wire it to a real HTTP client before deploying; reconcile logic is transport-free \
@@ -58,12 +70,20 @@ impl ClusterClient for ProxyClient {
         )))
     }
 
-    fn count_matching(&self, _ns: &str, _selector: &BTreeMap<String, String>) -> Result<usize, ClusterError> {
-        Err(ClusterError::Transport("ProxyClient is a transport stub".into()))
+    fn count_matching(
+        &self,
+        _ns: &str,
+        _selector: &BTreeMap<String, String>,
+    ) -> Result<usize, ClusterError> {
+        Err(ClusterError::Transport(
+            "ProxyClient is a transport stub".into(),
+        ))
     }
 
     fn patch_status(&self, _ns: &str, _name: &str, _status_json: &str) -> Result<(), ClusterError> {
-        Err(ClusterError::Transport("ProxyClient is a transport stub".into()))
+        Err(ClusterError::Transport(
+            "ProxyClient is a transport stub".into(),
+        ))
     }
 }
 
@@ -80,13 +100,9 @@ impl FakeClient {
         Self::default()
     }
 
-    pub fn with_config_map(
-        mut self,
-        ns: &str,
-        name: &str,
-        data: BTreeMap<String, String>,
-    ) -> Self {
-        self.config_maps.insert((ns.to_string(), name.to_string()), data);
+    pub fn with_config_map(mut self, ns: &str, name: &str, data: BTreeMap<String, String>) -> Self {
+        self.config_maps
+            .insert((ns.to_string(), name.to_string()), data);
         self
     }
 
@@ -97,20 +113,30 @@ impl FakeClient {
 }
 
 impl ClusterClient for FakeClient {
-    fn get_config_map(&self, ns: &str, name: &str) -> Result<BTreeMap<String, String>, ClusterError> {
+    fn get_config_map(
+        &self,
+        ns: &str,
+        name: &str,
+    ) -> Result<BTreeMap<String, String>, ClusterError> {
         self.config_maps
             .get(&(ns.to_string(), name.to_string()))
             .cloned()
             .ok_or_else(|| ClusterError::NotFound(format!("configmap {ns}/{name}")))
     }
 
-    fn count_matching(&self, _ns: &str, selector: &BTreeMap<String, String>) -> Result<usize, ClusterError> {
+    fn count_matching(
+        &self,
+        _ns: &str,
+        selector: &BTreeMap<String, String>,
+    ) -> Result<usize, ClusterError> {
         let key = selector.values().cloned().collect::<Vec<_>>().join(",");
         Ok(self.counts.get(&key).copied().unwrap_or(0))
     }
 
     fn patch_status(&self, ns: &str, name: &str, status_json: &str) -> Result<(), ClusterError> {
-        self.patches.borrow_mut().push(format!("{ns}/{name}: {status_json}"));
+        self.patches
+            .borrow_mut()
+            .push(format!("{ns}/{name}: {status_json}"));
         Ok(())
     }
 }
@@ -124,7 +150,9 @@ mod tests {
         let c = FakeClient::new().with_config_map(
             "mp",
             "cal",
-            [("budget".to_string(), "512".to_string())].into_iter().collect(),
+            [("budget".to_string(), "512".to_string())]
+                .into_iter()
+                .collect(),
         );
         assert_eq!(c.get_config_map("mp", "cal").unwrap()["budget"], "512");
         assert!(c.get_config_map("mp", "missing").is_err());
@@ -135,6 +163,9 @@ mod tests {
         // A stub that returned Ok(empty) would let the operator write a
         // "calibrated" status from data it never fetched.
         let c = ProxyClient::new("http://127.0.0.1:8001");
-        assert!(matches!(c.get_config_map("a", "b"), Err(ClusterError::Transport(_))));
+        assert!(matches!(
+            c.get_config_map("a", "b"),
+            Err(ClusterError::Transport(_))
+        ));
     }
 }

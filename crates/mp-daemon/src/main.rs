@@ -33,7 +33,10 @@ fn main() {
     }
 
     if args.iter().any(|a| a == "--print-config") {
-        println!("{}", serde_json::to_string_pretty(&Config::default()).unwrap());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&Config::default()).unwrap()
+        );
         return;
     }
 

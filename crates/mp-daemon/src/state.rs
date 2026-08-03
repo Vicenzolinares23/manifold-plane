@@ -27,7 +27,11 @@ pub struct Shared {
 
 impl Shared {
     pub fn new(cfg: Config, engine: Arc<Mutex<Engine>>) -> Self {
-        Shared { cfg: Arc::new(cfg), engine, counters: Arc::new(Counters::default()) }
+        Shared {
+            cfg: Arc::new(cfg),
+            engine,
+            counters: Arc::new(Counters::default()),
+        }
     }
 }
 
@@ -284,9 +288,10 @@ fn admit(s: &Shared, body: &[u8]) -> Response {
             let Some(b) = &p.ics else {
                 return bad(s, "ics payload required for this domain");
             };
-            let (Some(function), Some(criticality)) =
-                (parse_ics_function(&b.function), parse_criticality(&b.criticality))
-            else {
+            let (Some(function), Some(criticality)) = (
+                parse_ics_function(&b.function),
+                parse_criticality(&b.criticality),
+            ) else {
                 return bad(s, "unknown function or criticality");
             };
             ics::IcsAdapter::new(256)
@@ -486,19 +491,32 @@ mod tests {
             ..Default::default()
         };
         let barrier = Barrier::new(Metric::identity(), cfg.barrier_config()).unwrap();
-        let engine =
-            Engine::new(barrier, Relaxation::default(), EngineConfig::default());
+        let engine = Engine::new(barrier, Relaxation::default(), EngineConfig::default());
         Shared::new(cfg, Arc::new(Mutex::new(engine)))
     }
 
     fn post(s: &Shared, body: &str) -> Response {
-        route(s, Request { method: "POST".into(), path: "/admit".into(), body: body.into() })
+        route(
+            s,
+            Request {
+                method: "POST".into(),
+                path: "/admit".into(),
+                body: body.into(),
+            },
+        )
     }
 
     #[test]
     fn health_is_always_up() {
         let s = shared(Domain::Kubernetes);
-        let r = route(&s, Request { method: "GET".into(), path: "/healthz".into(), body: vec![] });
+        let r = route(
+            &s,
+            Request {
+                method: "GET".into(),
+                path: "/healthz".into(),
+                body: vec![],
+            },
+        );
         assert_eq!(r.status, 200);
     }
 
@@ -506,12 +524,22 @@ mod tests {
     fn readiness_is_false_until_the_budget_is_calibrated() {
         // Reporting ready while deciding against an arbitrary boundary would be
         // a lie the deployment acts on.
-        let cfg = Config { log_decisions: false, ..Default::default() };
+        let cfg = Config {
+            log_decisions: false,
+            ..Default::default()
+        };
         assert!(!cfg.budget_is_calibrated);
         let barrier = Barrier::new(Metric::identity(), cfg.barrier_config()).unwrap();
         let engine = Engine::new(barrier, Relaxation::default(), EngineConfig::default());
         let s = Shared::new(cfg, Arc::new(Mutex::new(engine)));
-        let r = route(&s, Request { method: "GET".into(), path: "/readyz".into(), body: vec![] });
+        let r = route(
+            &s,
+            Request {
+                method: "GET".into(),
+                path: "/readyz".into(),
+                body: vec![],
+            },
+        );
         assert_eq!(r.status, 503);
     }
 
@@ -526,7 +554,10 @@ mod tests {
         // reports 503 until a real calibration has run. An operator who ignores
         // both the startup warning and the readiness probe gets a daemon that
         // refuses everything, which is loud rather than silent.
-        let cfg = Config { log_decisions: false, ..Default::default() };
+        let cfg = Config {
+            log_decisions: false,
+            ..Default::default()
+        };
         let barrier = Barrier::new(Metric::identity(), cfg.barrier_config()).unwrap();
         let engine = Engine::new(barrier, Relaxation::default(), EngineConfig::default());
         let s = Shared::new(cfg, Arc::new(Mutex::new(engine)));
@@ -570,7 +601,10 @@ mod tests {
             decisions.push(body.contains("\"allowed\":true"));
         }
         assert!(decisions[0], "the first step should be allowed");
-        assert!(decisions.iter().any(|d| !d), "the chain should eventually be refused");
+        assert!(
+            decisions.iter().any(|d| !d),
+            "the chain should eventually be refused"
+        );
     }
 
     #[test]
@@ -613,7 +647,10 @@ mod tests {
         );
         let body = String::from_utf8(r.body).unwrap();
         assert!(body.contains("\"reason\":"), "{body}");
-        assert!(body.contains("docs/"), "explanation should cite the derivation: {body}");
+        assert!(
+            body.contains("docs/"),
+            "explanation should cite the derivation: {body}"
+        );
     }
 
     #[test]

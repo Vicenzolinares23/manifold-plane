@@ -61,7 +61,13 @@ impl Coalition {
     where
         F: Fn(&AskerId) -> Option<Vec6>,
     {
-        self.joint_state(|id| if id == subject { Some(*subject_z) } else { lookup(id) })
+        self.joint_state(|id| {
+            if id == subject {
+                Some(*subject_z)
+            } else {
+                lookup(id)
+            }
+        })
     }
 }
 
@@ -139,12 +145,7 @@ impl CouplingGraph {
     /// `max_size` truncates. The result is a greedy maximal clique rather than
     /// a full enumeration — deliberately, since missing a large coalition is
     /// preferable to a latency spike, and the pairwise ones are the common case.
-    pub fn coalitions_for(
-        &self,
-        id: &AskerId,
-        kappa_min: f64,
-        max_size: usize,
-    ) -> Vec<Coalition> {
+    pub fn coalitions_for(&self, id: &AskerId, kappa_min: f64, max_size: usize) -> Vec<Coalition> {
         if max_size < 2 {
             return Vec::new();
         }
@@ -185,7 +186,11 @@ impl CouplingGraph {
         let mut raw: Vec<f64> = members
             .iter()
             .map(|m| {
-                let s: f64 = members.iter().filter(|o| *o != m).map(|o| self.coupling(m, o)).sum();
+                let s: f64 = members
+                    .iter()
+                    .filter(|o| *o != m)
+                    .map(|o| self.coupling(m, o))
+                    .sum();
                 s / (n - 1).max(1) as f64
             })
             .collect();
@@ -199,7 +204,10 @@ impl CouplingGraph {
                 *w /= total;
             }
         }
-        Coalition { members, weights: raw }
+        Coalition {
+            members,
+            weights: raw,
+        }
     }
 }
 
