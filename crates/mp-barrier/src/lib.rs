@@ -131,7 +131,10 @@ impl BarrierConfig {
             return Err(format!("budget must be positive, got {}", self.budget));
         }
         if self.review_band < 0.0 {
-            return Err(format!("review_band must be non-negative, got {}", self.review_band));
+            return Err(format!(
+                "review_band must be non-negative, got {}",
+                self.review_band
+            ));
         }
         Ok(())
     }
@@ -251,7 +254,11 @@ impl Barrier {
         }
         if a.abs() < 1e-18 {
             // Degenerate: the step has no length in the metric.
-            return if b.abs() < 1e-18 { f64::INFINITY } else { (-c / b).max(0.0) };
+            return if b.abs() < 1e-18 {
+                f64::INFINITY
+            } else {
+                (-c / b).max(0.0)
+            };
         }
         let disc = b * b - 4.0 * a * c;
         if disc < 0.0 {
@@ -289,7 +296,12 @@ mod tests {
     fn barrier(alpha: f64, budget: f64) -> Barrier {
         Barrier::new(
             Metric::identity(),
-            BarrierConfig { alpha, budget, review_band: 0.0, denial_weight_bits: 0.25 },
+            BarrierConfig {
+                alpha,
+                budget,
+                review_band: 0.0,
+                denial_weight_bits: 0.25,
+            },
         )
         .unwrap()
     }
@@ -303,7 +315,10 @@ mod tests {
     #[test]
     fn a_small_step_from_the_origin_is_admitted() {
         let b = barrier(0.5, 100.0);
-        assert_eq!(b.evaluate(&[0.0; N], &axis_step(0, 1.0)).decision, Decision::Admit);
+        assert_eq!(
+            b.evaluate(&[0.0; N], &axis_step(0, 1.0)).decision,
+            Decision::Admit
+        );
     }
 
     #[test]
@@ -324,10 +339,16 @@ mod tests {
         for v0 in [0.0f64, 25.0, 50.0, 75.0, 90.0, 99.0] {
             let z = axis_step(0, v0.sqrt());
             let s = b.max_admissible_scale(&z, &axis_step(0, 1.0));
-            assert!(s < last, "scale should decrease monotonically: {s} !< {last}");
+            assert!(
+                s < last,
+                "scale should decrease monotonically: {s} !< {last}"
+            );
             last = s;
         }
-        assert!(last < 0.15, "near the boundary the step should be tiny, got {last}");
+        assert!(
+            last < 0.15,
+            "near the boundary the step should be tiny, got {last}"
+        );
     }
 
     #[test]
@@ -343,7 +364,11 @@ mod tests {
             if b.evaluate(&z, &step).decision.is_admitted() {
                 z = linalg::add(&z, &step);
             }
-            assert!(b.margin(&z) >= -1e-9, "escaped the safe set: h={}", b.margin(&z));
+            assert!(
+                b.margin(&z) >= -1e-9,
+                "escaped the safe set: h={}",
+                b.margin(&z)
+            );
         }
     }
 
@@ -372,7 +397,10 @@ mod tests {
             z = linalg::add(&z, &linalg::scale(&dir, s));
             let bound = b.adversary_bound(0.0, n);
             let actual = b.potential(&z);
-            assert!(actual <= bound + 1e-6, "step {n}: {actual} exceeded bound {bound}");
+            assert!(
+                actual <= bound + 1e-6,
+                "step {n}: {actual} exceeded bound {bound}"
+            );
             assert!(
                 actual >= bound - 1e-6,
                 "step {n}: saturating adversary should achieve the bound, {actual} vs {bound}"
@@ -388,7 +416,11 @@ mod tests {
             let step = axis_step(1, mag);
             let slack = b.envelope_slack(&z, &step);
             let admitted = b.evaluate(&z, &step).decision.is_admitted();
-            assert_eq!(slack >= -1e-12, admitted, "envelope and decision disagree at {mag}");
+            assert_eq!(
+                slack >= -1e-12,
+                admitted,
+                "envelope and decision disagree at {mag}"
+            );
         }
     }
 
@@ -399,7 +431,10 @@ mod tests {
         let b = barrier(0.01, 10.0);
         let z = axis_step(0, 3.0);
         for mag in [0.1, 1.0, 2.9] {
-            assert_eq!(b.evaluate(&z, &axis_step(0, -mag)).decision, Decision::Admit);
+            assert_eq!(
+                b.evaluate(&z, &axis_step(0, -mag)).decision,
+                Decision::Admit
+            );
         }
     }
 
@@ -418,7 +453,10 @@ mod tests {
     #[test]
     fn a_state_already_outside_the_set_is_refused() {
         let b = barrier(0.5, 1.0);
-        assert_eq!(b.evaluate(&axis_step(0, 10.0), &[0.0; N]).decision, Decision::Deny);
+        assert_eq!(
+            b.evaluate(&axis_step(0, 10.0), &[0.0; N]).decision,
+            Decision::Deny
+        );
     }
 
     #[test]
@@ -430,13 +468,21 @@ mod tests {
 
     #[test]
     fn config_rejects_out_of_range_alpha() {
-        assert!(
-            Barrier::new(Metric::identity(), BarrierConfig { alpha: 1.5, ..Default::default() })
-                .is_err()
-        );
-        assert!(
-            Barrier::new(Metric::identity(), BarrierConfig { alpha: 0.0, ..Default::default() })
-                .is_err()
-        );
+        assert!(Barrier::new(
+            Metric::identity(),
+            BarrierConfig {
+                alpha: 1.5,
+                ..Default::default()
+            }
+        )
+        .is_err());
+        assert!(Barrier::new(
+            Metric::identity(),
+            BarrierConfig {
+                alpha: 0.0,
+                ..Default::default()
+            }
+        )
+        .is_err());
     }
 }

@@ -8,3 +8,7 @@ repository.workspace = true
 
 [dependencies]
 mp-core = { workspace = true }
+
+[[bench]]
+name = "decision"
+harness = false

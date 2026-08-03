@@ -1,0 +1,90 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: manifoldpolicies.manifoldplane.io
+spec:
+  group: manifoldplane.io
+  scope: Namespaced
+  names:
+    plural: manifoldpolicies
+    singular: manifoldpolicy
+    kind: ManifoldPolicy
+    shortNames: [mpol]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Calibrated
+          type: boolean
+          jsonPath: .status.calibrated
+        - name: Budget
+          type: number
+          jsonPath: .status.budgetBitsSquared
+        - name: Alpha
+          type: number
+          jsonPath: .status.alpha
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [domain, minStepsToBoundary, symmetryClasses]
+              # There is deliberately no `alpha` and no `metric` field. Both are
+              # derived or measured (docs/03), and making them settable invites
+              # tuning until the demo looks right.
+              properties:
+                domain:
+                  type: string
+                  enum: [kubernetes, ics, agent]
+                minStepsToBoundary:
+                  type: number
+                  minimum: 1
+                  description: >-
+                    Least number of admitted requests an attacker must make to
+                    move from nominal to approachFraction of the budget. Alpha
+                    is derived from this (docs/06 T2).
+                approachFraction:
+                  type: number
+                  exclusiveMinimum: 0
+                  exclusiveMaximum: 1
+                  default: 0.99
+                symmetryClasses:
+                  type: array
+                  minItems: 1
+                  description: >-
+                    Sets of askers that are interchangeable by construction.
+                    The one thing the software cannot infer, and without it the
+                    orbit residual is unavailable (docs/07 F2).
+                  items:
+                    type: object
+                    required: [name, selector]
+                    properties:
+                      name: {type: string}
+                      selector:
+                        type: object
+                        additionalProperties: {type: string}
+                calibrationConfigMap:
+                  type: string
+                maxBudgetDrift:
+                  type: number
+                  exclusiveMinimum: 0
+                  maximum: 1
+                  default: 0.25
+            status:
+              type: object
+              properties:
+                observedGeneration: {type: integer}
+                phase: {type: string}
+                budgetBitsSquared: {type: number}
+                alpha: {type: number}
+                calibrated: {type: boolean}
+                conditions:
+                  type: array
+                  items: {type: string}

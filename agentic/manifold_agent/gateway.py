@@ -1,8 +1,7 @@
-"""HTTP gateway to mp-daemon (`docs/08` §8.3 / §8.6)."""
+"""HTTP gateway to manifold-planed (`POST /admit` agent domain)."""
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import httpx
@@ -24,13 +23,19 @@ def decide(
     engine_url: str | None = None,
     timeout: float = 5.0,
 ) -> Verdict:
-    """POST ``/v1/decide`` and return a typed Verdict."""
+    """POST ``/admit`` with an agent tool-call payload and return a typed Verdict.
+
+    ``at`` is accepted for Stage 8 call-site compatibility; the daemon stamps
+    decision time itself.
+    """
+    _ = at
     settings = get_settings()
     base = (engine_url or settings.engine_url).rstrip("/")
     payload: dict[str, Any] = {
-        "asker_id": asker_id,
-        "symmetry_class": symmetry_class or settings.symmetry_class,
-        "tool_call": {
+        "asker": asker_id,
+        "class": symmetry_class or settings.symmetry_class,
+        "label": tool_call.name,
+        "agent": {
             "kind": tool_call.kind.value,
             "payload_bytes": tool_call.payload_bytes,
             "recipients": tool_call.recipients,
@@ -38,20 +43,19 @@ def decide(
             "off_transcript": tool_call.off_transcript,
             "source_sensitivity": tool_call.source_sensitivity,
         },
-        "at": float(at if at is not None else time.time()),
     }
     try:
         with httpx.Client(timeout=timeout) as client:
-            resp = client.post(f"{base}/v1/decide", json=payload)
+            resp = client.post(f"{base}/admit", json=payload)
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError as exc:
-        raise DaemonError(f"engine decide failed: {exc}") from exc
+        raise DaemonError(f"engine admit failed: {exc}") from exc
 
     return Verdict(
         decision=Decision(data["decision"]),
-        admissible_fraction=float(data["admissible_fraction"]),
-        coalitions_checked=int(data["coalitions_checked"]),
+        admissible_fraction=float(data.get("admissible_fraction", 0.0)),
+        coalitions_checked=int(data.get("coalitions_checked", 0)),
         blocked_by_coalition=data.get("blocked_by_coalition"),
         margin_before=float(data["margin_before"]),
         margin_after=float(data["margin_after"]),
@@ -59,10 +63,10 @@ def decide(
         alpha_effective=float(data["alpha_effective"]),
         orbit_residual=float(data["orbit_residual"]),
         budget_fraction=float(data["budget_fraction"]),
-        state_after=list(data["state_after"]),
-        denied=int(data["denied"]),
-        held=int(data["held"]),
-        admitted=int(data["admitted"]),
+        state_after=list(data.get("state_after") or [0.0] * 6),
+        denied=int(data.get("denied", 0)),
+        held=int(data.get("held", 0)),
+        admitted=int(data.get("admitted", 0)),
     )
 
 

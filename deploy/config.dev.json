@@ -1,0 +1,18 @@
+{
+  "listen": "0.0.0.0:8787",
+  "domain": "agent",
+  "min_steps_to_boundary": 120.0,
+  "approach_fraction": 0.99,
+  "budget_bits_squared": 4096.0,
+  "budget_is_calibrated": true,
+  "review_band": 0.02,
+  "denial_weight_bits": 0.25,
+  "kappa_min_bits": 0.5,
+  "max_coalition": 8,
+  "idle_evict_secs": 2592000.0,
+  "half_lives_secs": null,
+  "max_budget_drift_per_refit": 0.25,
+  "fail_open": false,
+  "log_decisions": true,
+  "max_body_bytes": 1048576
+}

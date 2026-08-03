@@ -119,7 +119,9 @@ pub struct K8sAdapter {
 
 impl K8sAdapter {
     pub fn new(total_namespaces: u32) -> Self {
-        K8sAdapter { total_namespaces: total_namespaces.max(1) }
+        K8sAdapter {
+            total_namespaces: total_namespaces.max(1),
+        }
     }
 }
 
@@ -141,8 +143,8 @@ impl Adapter for K8sAdapter {
         }
 
         // Reach: resource class expansion, scaled by namespace span.
-        let span = (r.namespace_span.max(1) as f64 / self.total_namespaces.max(1) as f64)
-            .clamp(0.0, 1.0);
+        let span =
+            (r.namespace_span.max(1) as f64 / self.total_namespaces.max(1) as f64).clamp(0.0, 1.0);
         d = d.with(Axis::Reach, r.resource.reach_bits() * (0.5 + 0.5 * span));
 
         // Irreversibility: verb preimages, plus the floor for destroyed state.
@@ -196,8 +198,10 @@ mod tests {
     #[test]
     fn a_cluster_role_binding_costs_far_more_reach_than_a_configmap() {
         let a = adapter().displacement(&req(Verb::Create, ResourceClass::ConfigMap), &[0.0; N]);
-        let b = adapter()
-            .displacement(&req(Verb::Create, ResourceClass::ClusterRoleBinding), &[0.0; N]);
+        let b = adapter().displacement(
+            &req(Verb::Create, ResourceClass::ClusterRoleBinding),
+            &[0.0; N],
+        );
         assert!(b.get(Axis::Reach) > a.get(Axis::Reach) + 3.0);
     }
 

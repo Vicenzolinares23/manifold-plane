@@ -1,11 +1,10 @@
 # manifold-plane agentic stack: Postgres + engine daemon + agent.
 #
 #   docker compose up -d postgres engine
-#   docker compose up agent            # build the agent image and run a demo
+#   docker compose up agent
 #
-# `engine` runs the Rust mp-daemon. `agent` runs the LangGraph layer
-# (`agentic/`), which talks to Postgres and the engine and to Ollama
-# (expected at http://localhost:11434 from the host network).
+# Engine image is the repo-root Dockerfile (manifold-planed). Agent talks to
+# Postgres and the engine; Ollama is expected on the host at :11434.
 
 services:
   postgres:
@@ -27,11 +26,12 @@ services:
   engine:
     build:
       context: .
-      dockerfile: docker/engine.Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "8787:8787"
-    environment:
-      MP_ENGINE_ADDR: "0.0.0.0:8787"
+    volumes:
+      - ./deploy/config.dev.json:/etc/manifold-plane/config.json:ro
+    command: ["--config", "/etc/manifold-plane/config.json"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -114,7 +114,9 @@ pub struct IcsAdapter {
 
 impl IcsAdapter {
     pub fn new(segment_points: u32) -> Self {
-        IcsAdapter { segment_points: segment_points.max(1) }
+        IcsAdapter {
+            segment_points: segment_points.max(1),
+        }
     }
 }
 
@@ -140,9 +142,11 @@ impl Adapter for IcsAdapter {
         d = d.with(Axis::Authority, 0.5 + 0.5 * span);
 
         // Reach: criticality, scaled by the fraction of the segment touched.
-        let seg_frac =
-            (r.point_count as f64 / self.segment_points as f64).clamp(0.0, 1.0);
-        d = d.with(Axis::Reach, r.criticality.reach_bits() * (0.5 + 0.5 * seg_frac));
+        let seg_frac = (r.point_count as f64 / self.segment_points as f64).clamp(0.0, 1.0);
+        d = d.with(
+            Axis::Reach,
+            r.criticality.reach_bits() * (0.5 + 0.5 * seg_frac),
+        );
 
         // Irreversibility: the physical process entropy, scaled by how far the
         // command actually moves the process. A write that changes nothing
@@ -153,7 +157,10 @@ impl Adapter for IcsAdapter {
 
         // Opacity: diagnostics can silence a device; SBO bypass removes the
         // operator-confirmation record that would otherwise exist.
-        if matches!(r.function, FunctionCode::Diagnostic | FunctionCode::ConfigWrite) {
+        if matches!(
+            r.function,
+            FunctionCode::Diagnostic | FunctionCode::ConfigWrite
+        ) {
             d = d.with(Axis::Opacity, 3.0);
         }
         if r.bypasses_sbo {
@@ -248,7 +255,10 @@ mod tests {
                 .displacement(&write(PointCriticality::Direct, 0.01), &[0.0; N])
                 .get(Axis::Irreversibility);
         }
-        assert!(total > 5.0, "a hundred 1% steps accumulated only {total} bits");
+        assert!(
+            total > 5.0,
+            "a hundred 1% steps accumulated only {total} bits"
+        );
     }
 
     #[test]

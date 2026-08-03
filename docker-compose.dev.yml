@@ -1,0 +1,99 @@
+name: manifold-plane-dev
+
+x-logging: &minimal-logging
+  driver: "local"
+  options:
+    max-size: "1m"
+    max-file: "1"
+    compress: "false"
+
+services:
+  # The admission daemon guarding LLM agent tool-calls.
+  #
+  # Runs in the `agent` domain here because that is the domain the local model
+  # below can actually exercise end to end. Swap MP_DOMAIN for kubernetes or
+  # ics and point a different client at it; the kernel is identical.
+  manifold-planed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: manifold-plane/daemon:dev
+    container_name: manifold-planed-dev
+    restart: unless-stopped
+    logging: *minimal-logging
+    ports:
+      - "${MP_PORT:-8443}:8443"
+    volumes:
+      - ./deploy/config.dev.json:/etc/manifold-plane/config.json:ro
+    command: ["--config", "/etc/manifold-plane/config.json"]
+    networks:
+      - manifold-dev-network
+    healthcheck:
+      # /healthz, not /readyz. readyz is 503 until a calibration has run, which
+      # is correct behavior and would otherwise wedge compose on first boot.
+      test: ["CMD", "/usr/local/bin/manifold-planed", "--print-config"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Local 8B model. Gives the harness a real agent to drive, rather than
+  # replayed synthetic tool calls that were written by someone who already knew
+  # what the detector looks for.
+  ollama:
+    build:
+      context: ./ops/docker/ollama
+      dockerfile: Dockerfile
+      args:
+        PRE_PULL_MODELS: "true"
+        MODELS: "${OLLAMA_MODELS:-llama3:8b}"
+    image: manifold-plane/ollama:dev
+    container_name: manifold-plane-ollama-dev
+    restart: unless-stopped
+    logging: *minimal-logging
+    ports:
+      - "${OLLAMA_PORT:-11435}:11434"
+    volumes:
+      - ollama_dev_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_KEEP_ALIVE: "24h"
+      OLLAMA_NUM_PARALLEL: "4"
+      OLLAMA_MAX_LOADED_MODELS: "2"
+    networks:
+      - manifold-dev-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  # Drives the model through tool-using tasks and submits every tool call to
+  # the daemon. Profile-gated so `docker compose up` does not immediately start
+  # generating load.
+  agent-harness:
+    build:
+      context: .
+      dockerfile: ops/docker/harness/Dockerfile
+    image: manifold-plane/harness:dev
+    container_name: manifold-plane-harness-dev
+    profiles: ["demo"]
+    logging: *minimal-logging
+    environment:
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "${OLLAMA_MODELS:-llama3:8b}"
+      MANIFOLD_URL: "http://manifold-planed:8443"
+      SCENARIO: "${SCENARIO:-exfiltration}"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - manifold-dev-network
+
+volumes:
+  ollama_dev_data:
+
+networks:
+  manifold-dev-network:
+    driver: bridge

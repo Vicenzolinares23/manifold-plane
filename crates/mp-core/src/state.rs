@@ -66,7 +66,9 @@ impl Default for Relaxation {
 
 impl Relaxation {
     pub fn from_half_lives(half_lives: &Vec6) -> Self {
-        Relaxation { rates: rates_from_half_lives(half_lives) }
+        Relaxation {
+            rates: rates_from_half_lives(half_lives),
+        }
     }
 
     pub fn from_rates(rates: Vec6) -> Self {
@@ -201,7 +203,11 @@ mod tests {
         let out = r.relax(&z, year);
         // Destroyed information does not come back. A year should cost well
         // under one percent of the accumulated irreversibility.
-        assert!(out[Axis::Irreversibility.index()] > 9.9, "got {}", out[Axis::Irreversibility.index()]);
+        assert!(
+            out[Axis::Irreversibility.index()] > 9.9,
+            "got {}",
+            out[Axis::Irreversibility.index()]
+        );
     }
 
     #[test]
@@ -210,7 +216,11 @@ mod tests {
         let mut z = linalg::ZERO_V;
         z[Axis::Tempo.index()] = 10.0;
         let out = r.relax(&z, 600.0);
-        assert!(out[Axis::Tempo.index()] < 0.01, "got {}", out[Axis::Tempo.index()]);
+        assert!(
+            out[Axis::Tempo.index()] < 0.01,
+            "got {}",
+            out[Axis::Tempo.index()]
+        );
     }
 
     #[test]

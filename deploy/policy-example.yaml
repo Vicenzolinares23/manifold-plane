@@ -1,0 +1,31 @@
+apiVersion: manifoldplane.io/v1alpha1
+kind: ManifoldPolicy
+metadata:
+  name: controllers
+  namespace: manifold-plane
+spec:
+  domain: kubernetes
+
+  # Read as: an attacker must make at least 400 admitted requests to get from a
+  # nominal position to 99% of the budget. Alpha follows from this; you do not
+  # set alpha.
+  minStepsToBoundary: 400
+  approachFraction: 0.99
+
+  # Members must be genuinely interchangeable. A class whose members do
+  # different work produces a large orbit residual for everyone and throttles
+  # the whole class — the failure is loud, but it is still a failure.
+  symmetryClasses:
+    - name: ingress-controllers
+      selector:
+        app.kubernetes.io/name: ingress-nginx
+    - name: cert-managers
+      selector:
+        app.kubernetes.io/name: cert-manager
+
+  # Produced by a calibration run over benign traffic. Without it the daemon
+  # reports Degraded and /readyz returns 503, which is correct: deciding
+  # against an uncalibrated boundary is not a service worth reporting healthy.
+  calibrationConfigMap: mp-calibration
+
+  maxBudgetDrift: 0.25

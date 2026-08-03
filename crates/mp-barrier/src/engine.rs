@@ -32,7 +32,11 @@ pub struct EngineConfig {
 
 impl Default for EngineConfig {
     fn default() -> Self {
-        EngineConfig { kappa_min: 0.5, max_coalition: 8, idle_evict_secs: 30.0 * 86400.0 }
+        EngineConfig {
+            kappa_min: 0.5,
+            max_coalition: 8,
+            idle_evict_secs: 30.0 * 86400.0,
+        }
     }
 }
 
@@ -77,7 +81,13 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(barrier: Barrier, relax: Relaxation, cfg: EngineConfig) -> Self {
-        Engine { barrier, relax, cfg, states: BTreeMap::new(), graph: CouplingGraph::new() }
+        Engine {
+            barrier,
+            relax,
+            cfg,
+            states: BTreeMap::new(),
+            graph: CouplingGraph::new(),
+        }
     }
 
     pub fn barrier(&self) -> &Barrier {
@@ -131,27 +141,33 @@ impl Engine {
         let resid = orbit::residual(self.barrier.metric(), &z, &peers);
 
         // Barrier check for the asker itself.
-        let mut verdict =
-            self.barrier.evaluate_with_residual(&z, &p.displacement, resid.ratio);
+        let mut verdict = self
+            .barrier
+            .evaluate_with_residual(&z, &p.displacement, resid.ratio);
 
         let z_next = linalg::add(&z, &p.displacement);
 
         // Separation: the barrier must also hold for every coalition the asker
         // belongs to. A coalition can block a step that is individually fine.
         let coalitions =
-            self.graph.coalitions_for(&p.asker, self.cfg.kappa_min, self.cfg.max_coalition);
+            self.graph
+                .coalitions_for(&p.asker, self.cfg.kappa_min, self.cfg.max_coalition);
         let checked = coalitions.len();
 
         for c in &coalitions {
             let joint_before = c.joint_state(|id| Some(self.displacement_at(id, now)));
-            let joint_after = c.joint_state_with(&p.asker, &z_next, |id| {
-                Some(self.displacement_at(id, now))
-            });
+            let joint_after =
+                c.joint_state_with(&p.asker, &z_next, |id| Some(self.displacement_at(id, now)));
             let step = linalg::sub(&joint_after, &joint_before);
 
-            let cv = self.barrier.evaluate_with_residual(&joint_before, &step, resid.ratio);
+            let cv = self
+                .barrier
+                .evaluate_with_residual(&joint_before, &step, resid.ratio);
             if cv.decision != Decision::Admit && verdict.decision == Decision::Admit {
-                verdict = Verdict { blocked_by_coalition: Some(c.size()), ..cv };
+                verdict = Verdict {
+                    blocked_by_coalition: Some(c.size()),
+                    ..cv
+                };
             }
         }
 
@@ -251,7 +267,12 @@ mod tests {
     fn engine(alpha: f64, budget: f64) -> Engine {
         let b = Barrier::new(
             Metric::identity(),
-            BarrierConfig { alpha, budget, review_band: 0.0, denial_weight_bits: 0.25 },
+            BarrierConfig {
+                alpha,
+                budget,
+                review_band: 0.0,
+                denial_weight_bits: 0.25,
+            },
         )
         .unwrap();
         Engine::new(b, Relaxation::default(), EngineConfig::default())
@@ -315,7 +336,10 @@ mod tests {
         let hot = e.displacement_at(&AskerId::new("d"), 0.0);
         let later = e.displacement_at(&AskerId::new("d"), 90.0 * 86400.0);
         let ratio = e.barrier().potential(&later) / e.barrier().potential(&hot);
-        assert!(ratio > 0.99, "irreversibility decayed to {ratio} of itself in 90 days");
+        assert!(
+            ratio > 0.99,
+            "irreversibility decayed to {ratio} of itself in 90 days"
+        );
     }
 
     #[test]
@@ -323,7 +347,8 @@ mod tests {
         // Neither asker is near the boundary alone; together they exceed it.
         // This is the case no deployed authorization system detects.
         let mut e = engine(0.9, 10.0);
-        e.graph_mut().set_coupling(&AskerId::new("a"), &AskerId::new("b"), 4.0);
+        e.graph_mut()
+            .set_coupling(&AskerId::new("a"), &AskerId::new("b"), 4.0);
 
         // Push b most of the way up on its own.
         e.decide(&prop("b", "g", 0, 2.9, 0.0));
@@ -335,7 +360,10 @@ mod tests {
         let coupled = e.decide(&prop("a", "g", 0, 2.9, 1.0));
 
         assert_eq!(solo, Decision::Admit, "the step is fine in isolation");
-        assert!(coupled.coalitions_checked > 0, "coalition should have been evaluated");
+        assert!(
+            coupled.coalitions_checked > 0,
+            "coalition should have been evaluated"
+        );
     }
 
     #[test]

@@ -1,13 +1,13 @@
 [package]
 name = "mp-daemon"
-description = "HTTP admission daemon exposing the manifold-plane engine."
+description = "manifold-planed: the trajectory-based admission daemon."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "mp-daemon"
+name = "manifold-planed"
 path = "src/main.rs"
 
 [dependencies]
@@ -15,16 +15,4 @@ mp-core = { workspace = true }
 mp-barrier = { workspace = true }
 mp-adapters = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-axum = { version = "0.8", features = ["json"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["trace", "cors"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-thiserror = "2"
-
-[dev-dependencies]
-http-body-util = "0.1"
-tower = { version = "0.5", features = ["util"] }
 serde_json = { workspace = true }

@@ -62,7 +62,10 @@ impl JointHistogram {
     }
 
     pub fn observe(&mut self, a: &str, b: &str) {
-        *self.joint.entry((a.to_string(), b.to_string())).or_insert(0) += 1;
+        *self
+            .joint
+            .entry((a.to_string(), b.to_string()))
+            .or_insert(0) += 1;
         self.left.observe(a);
         self.right.observe(b);
         self.total += 1;
@@ -123,10 +126,7 @@ impl JointHistogram {
 /// contribute — a bucket where one is silent carries no information about
 /// joint behavior, and counting it as a "null" action would manufacture
 /// coupling out of two askers merely being idle at the same time.
-pub fn coupling_bits(
-    a_stream: &[(u64, String)],
-    b_stream: &[(u64, String)],
-) -> f64 {
+pub fn coupling_bits(a_stream: &[(u64, String)], b_stream: &[(u64, String)]) -> f64 {
     let b_map: BTreeMap<u64, &String> = b_stream.iter().map(|(t, s)| (*t, s)).collect();
     let mut joint = JointHistogram::new();
     for (t, a) in a_stream {
@@ -147,8 +147,7 @@ mod tests {
 
     #[test]
     fn identical_streams_have_high_coupling() {
-        let a: Vec<(u64, String)> =
-            (0..400).map(|i| (i, format!("op{}", i % 4))).collect();
+        let a: Vec<(u64, String)> = (0..400).map(|i| (i, format!("op{}", i % 4))).collect();
         let mi = coupling_bits(&a, &a);
         // Four equiprobable actions perfectly correlated carry 2 bits.
         assert!(mi > 1.8, "identical streams scored only {mi}");
@@ -158,10 +157,10 @@ mod tests {
     fn independent_streams_have_near_zero_coupling() {
         // The case the bias correction exists for. Two rich but unrelated
         // vocabularies must not read as a coalition.
-        let a: Vec<(u64, String)> =
-            (0..2000).map(|i| (i, format!("op{}", i % 7))).collect();
-        let b: Vec<(u64, String)> =
-            (0..2000).map(|i| (i, format!("act{}", (i * 3 + 1) % 11))).collect();
+        let a: Vec<(u64, String)> = (0..2000).map(|i| (i, format!("op{}", i % 7))).collect();
+        let b: Vec<(u64, String)> = (0..2000)
+            .map(|i| (i, format!("act{}", (i * 3 + 1) % 11)))
+            .collect();
         let mi = coupling_bits(&a, &b);
         assert!(mi < 0.3, "independent streams scored {mi}");
     }
@@ -213,7 +212,10 @@ mod tests {
             let b = seed % 12;
             j.observe(&format!("a{a}"), &format!("b{b}"));
         }
-        assert!(j.bias_bits() > 0.5, "bias term should be large in this regime");
+        assert!(
+            j.bias_bits() > 0.5,
+            "bias term should be large in this regime"
+        );
     }
 
     #[test]
