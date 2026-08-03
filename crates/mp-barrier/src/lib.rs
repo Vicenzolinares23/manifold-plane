@@ -24,9 +24,11 @@ use mp_core::linalg::{self, Vec6};
 use mp_core::metric::Metric;
 
 pub mod coalition;
+pub mod engine;
 pub mod orbit;
 
 pub use coalition::{Coalition, CouplingGraph};
+pub use engine::{Engine, EngineConfig, Outcome, Proposal};
 pub use orbit::OrbitResidual;
 
 /// Outcome of an admission decision.

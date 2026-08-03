@@ -162,6 +162,13 @@ impl AskerState {
     /// One denial is a fraction of a bit; a sustained probe accumulates into a
     /// real tempo excursion, and tempo's 30-second half-life means an
     /// occasional legitimate rejection is forgotten almost immediately.
+    ///
+    /// **Unchecked.** This writes to the state without consulting the barrier.
+    /// Applied raw and repeatedly it will walk an asker out of the safe set on
+    /// denials alone, which breaks forward invariance through the one path the
+    /// T1 proof does not cover — see `docs/07-adversarial-validation.md` F1.
+    /// `mp_barrier::Engine` routes the charge through the step envelope instead.
+    /// Callers doing otherwise must clamp it themselves.
     pub fn record_denial(&mut self, weight_bits: f64) {
         self.denied += 1;
         self.z[Axis::Tempo.index()] += weight_bits;
