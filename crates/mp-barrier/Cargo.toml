@@ -1,8 +1,10 @@
 [package]
 name = "mp-barrier"
+description = "Discrete-time exponential control barrier admission kernel for manifold-plane."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
+mp-core = { workspace = true }
