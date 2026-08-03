@@ -1,0 +1,6 @@
+target/
+**/target/
+.git/
+sim/out/
+*.md
+!README.md
