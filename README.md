@@ -39,4 +39,4 @@ make py-test        # pytest under agentic/
 ## Status
 
 The engine (docs 0–7, `mp-core`/`mp-barrier`/`mp-adapters`) is proven and
-tested. The agentic layer (docs 8, `agentic/`) is the active build.
+tested. The agentic layer (docs 8, `agentic/`) implements LangGraph, tools, memory, guardrails, fine-tune hooks, and Postgres schema.
