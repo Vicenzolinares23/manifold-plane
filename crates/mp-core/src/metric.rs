@@ -146,36 +146,87 @@ fn lyapunov_inv(s: &Mat6, rates: &Vec6) -> Mat6 {
     symmetrize(&out)
 }
 
-/// Project a symmetric matrix onto `{M ≻ 0} ∩ {ΛM + MΛ ⪰ 0}` by alternating
-/// projections, returning the projected matrix and the Frobenius distance moved.
+/// Make a symmetric matrix positive definite and Lyapunov-feasible, in
+/// closed form, returning it with the Frobenius distance moved.
 ///
-/// The second step is an approximate projection: the Lyapunov operator is
-/// linear and invertible but not orthogonal, so mapping through it, clipping
-/// the spectrum, and mapping back is not the exact metric projection onto that
-/// set. It is a contraction toward feasibility, alternation converges to a
-/// point in the intersection, and — this being the part that matters —
-/// feasibility of the *result* is verified directly by `Metric::new` rather
-/// than assumed from the procedure.
+/// Damp each entry by the ratio of the geometric to the arithmetic mean of its
+/// two decay rates:
+///
+/// ```text
+///     C[i][j] = 2·√(λᵢλⱼ) / (λᵢ + λⱼ),     M' = M ∘ C
+/// ```
+///
+/// Then `(ΛM' + M'Λ)[i][j] = 2·√(λᵢλⱼ)·M[i][j]`, i.e. `ΛM' + M'Λ = 2·Λ^½ M Λ^½`,
+/// which is PSD by congruence whenever `M` is. `M'` stays PSD too: `C` is a
+/// Hadamard product of the rank-one kernel `√λᵢ√λⱼ` with the Cauchy kernel
+/// `1/(λᵢ+λⱼ)`, both PSD for positive rates, so `C` is PSD with unit diagonal
+/// and Schur's product theorem gives `M ∘ C ⪰ 0`. Single pass, no iteration.
+///
+/// `C` is 1 on the diagonal and shrinks as two axes' rates diverge, so **an
+/// axis that never decays cannot stay correlated with a fast one.** That is the
+/// real content of the Lyapunov condition rather than an artifact of the
+/// method, and it is why `docs/05` §5.6 warned this constraint binds here.
+/// Authority and reach differ by a factor of four in rate and keep ~0.8 of
+/// their fitted correlation; irreversibility, nine orders slower than tempo,
+/// is decorrelated from it almost entirely.
+///
+/// Two alternatives were implemented and rejected, both on measured failures:
+///
+/// - Alternating projections through `L⁻¹`. `L⁻¹` scales entry `(i,j)` by
+///   `1/(λᵢ+λⱼ)` — about `4e-13` for the slow-slow entry — so it amplifies by
+///   `~10¹²`. On a fitted metric it produced a budget of `3.1e8` bits²: valid
+///   arithmetic, meaningless geometry.
+/// - Bisecting one global damping factor toward the diagonal. Stable, but far
+///   too blunt: it crushed the authority-reach correlation, which was never the
+///   problem, along with the irreversibility coupling, which was — discarding
+///   exactly the structure `docs/04` identifies as carrying the escalation
+///   signal.
 pub fn project_feasible(raw: &Mat6, rates: &Vec6) -> (Mat6, f64) {
     let original = symmetrize(raw);
-    let mut m = original;
+    let mut m = spectral_map(&original, |l| l.max(PD_FLOOR));
 
-    for _ in 0..256 {
-        // Onto the positive-definite cone.
-        m = spectral_map(&m, |l| l.max(PD_FLOOR));
-
-        // Onto the Lyapunov-feasible set.
-        let s = lyapunov(&m, rates);
-        if min_eigenvalue(&s) >= 0.0 && min_eigenvalue(&m) >= PD_FLOOR {
-            break;
+    let mut out = [[0.0; N]; N];
+    for i in 0..N {
+        for j in 0..N {
+            let denom = rates[i] + rates[j];
+            let c = if denom > 0.0 {
+                2.0 * (rates[i] * rates[j]).sqrt() / denom
+            } else if i == j {
+                1.0
+            } else {
+                0.0
+            };
+            out[i][j] = m[i][j] * c;
         }
-        let s_clipped = spectral_map(&s, |l| l.max(0.0));
-        m = lyapunov_inv(&s_clipped, rates);
     }
 
-    m = spectral_map(&m, |l| l.max(PD_FLOOR));
+    m = symmetrize(&out);
+    if min_eigenvalue(&m) < PD_FLOOR {
+        m = spectral_map(&m, |l| l.max(PD_FLOOR));
+    }
+
     let dist = frobenius(&linalg::mat_sub(&m, &original));
     (m, dist)
+}
+
+/// The damping matrix `C`. Exposed so a deployment can see which axis pairs its
+/// measured half-lives forbid from being correlated — a large off-diagonal
+/// suppression is a fact about the environment worth surfacing.
+pub fn damping_matrix(rates: &Vec6) -> Mat6 {
+    let mut c = [[0.0; N]; N];
+    for i in 0..N {
+        for j in 0..N {
+            let denom = rates[i] + rates[j];
+            c[i][j] = if denom > 0.0 {
+                2.0 * (rates[i] * rates[j]).sqrt() / denom
+            } else if i == j {
+                1.0
+            } else {
+                0.0
+            };
+        }
+    }
+    c
 }
 
 /// Sample covariance of benign displacement vectors.
@@ -388,6 +439,66 @@ mod tests {
     fn covariance_rejects_too_few_samples() {
         let s = vec![[0.0; N]; 3];
         assert!(matches!(covariance(&s), Err(MetricError::InsufficientSamples { .. })));
+    }
+
+    #[test]
+    fn damping_preserves_similar_rates_and_crushes_disparate_ones() {
+        // The behavior the closed form exists for. Authority and reach have
+        // rates within a factor of four and must keep their correlation, since
+        // docs/04 identifies it as carrying the escalation signal.
+        // Irreversibility is nine orders slower than tempo and cannot stay
+        // correlated with it under the Lyapunov condition.
+        use crate::axis::Axis;
+        let r = rates();
+        let c = damping_matrix(&r);
+
+        let ah = c[Axis::Authority.index()][Axis::Reach.index()];
+        let it = c[Axis::Irreversibility.index()][Axis::Tempo.index()];
+
+        assert!(ah > 0.7, "authority-reach correlation over-damped: {ah}");
+        assert!(it < 1e-4, "irreversibility-tempo correlation under-damped: {it}");
+        for i in 0..N {
+            assert!((c[i][i] - 1.0).abs() < 1e-12, "diagonal must be unity");
+        }
+    }
+
+    #[test]
+    fn the_closed_form_makes_an_arbitrary_correlated_metric_feasible() {
+        let r = rates();
+        let mut m = linalg::identity();
+        // Correlate every pair, including the ones the condition forbids.
+        for i in 0..N {
+            for j in 0..N {
+                if i != j {
+                    m[i][j] = 0.6;
+                }
+            }
+        }
+        let (fixed, dist) = project_feasible(&m, &r);
+        assert!(dist > 0.0);
+        assert!(is_psd(&lyapunov(&fixed, &r)), "must be Lyapunov-feasible");
+        assert!(min_eigenvalue(&fixed) > 0.0, "must stay positive definite");
+    }
+
+    #[test]
+    fn a_feasible_fitted_metric_never_gains_potential_under_relaxation() {
+        // End-to-end check of what the whole apparatus is for: after
+        // projection, decay toward baseline can only reduce V, at every
+        // timescale from a second to a decade.
+        let r = rates();
+        let mut m = linalg::identity();
+        m[0][1] = 0.9;
+        m[1][0] = 0.9;
+        m[2][5] = 0.8;
+        m[5][2] = 0.8;
+        let (fixed, _) = project_feasible(&m, &r);
+        let z = [2.0, -3.0, 1.5, 0.5, -1.0, 4.0];
+        for dt in [1.0, 60.0, 3600.0, 86400.0, 3.15e8] {
+            assert!(
+                !relaxation_increases_potential(&fixed, &r, &z, dt),
+                "potential grew under relaxation at dt={dt}"
+            );
+        }
     }
 
     #[test]

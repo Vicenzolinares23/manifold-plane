@@ -141,19 +141,75 @@ def lyapunov_inv(s, rates):
 
 
 def project_feasible(raw, rates, floor=1e-9):
-    """Project onto {M ≻ 0} ∩ {ΛM + MΛ ⪰ 0} by alternating projections.
+    """Make M positive definite and Lyapunov-feasible, in closed form.
 
-    docs/05 §5.6. Without this, relaxation toward baseline can *increase* V and
-    an asker can leave the safe set while issuing no requests at all.
+    docs/05 §5.6. Without feasibility, relaxation toward baseline can *increase*
+    V, and an asker leaves the safe set while issuing no requests at all.
+
+    Construction. Damp each entry by the ratio of the geometric to the
+    arithmetic mean of its two decay rates:
+
+        C[i][j] = 2·√(λᵢλⱼ) / (λᵢ + λⱼ),     M' = M ∘ C
+
+    Then (ΛM' + M'Λ)[i][j] = (λᵢ+λⱼ)·M'[i][j] = 2·√(λᵢλⱼ)·M[i][j], i.e.
+
+        ΛM' + M'Λ = 2·Λ^½ M Λ^½
+
+    which is PSD by congruence whenever M is. And M' itself stays PSD: C is a
+    Hadamard product of the rank-one kernel √λᵢ√λⱼ with the Cauchy kernel
+    1/(λᵢ+λⱼ), both PSD for positive rates, so C is PSD with unit diagonal and
+    Schur's theorem gives M ∘ C ⪰ 0. Exact, single-pass, no iteration.
+
+    What it means. C is 1 on the diagonal and shrinks as two axes' rates
+    diverge, so **an axis that never decays cannot stay correlated with a fast
+    one**. That is not an artifact — it is the real content of the Lyapunov
+    condition, and it is why docs/05 §5.6 warned this constraint binds here
+    rather than being a formality. Authority and reach have rates within a
+    factor of four and keep ~0.8 of their fitted correlation. Irreversibility,
+    nine orders slower than tempo, is decorrelated from it almost entirely.
+
+    Two rejected alternatives, both real failures rather than hypotheticals:
+
+    - Alternating projections through L⁻¹. Numerically unusable: L⁻¹ scales
+      entry (i,j) by 1/(λᵢ+λⱼ), about 4e-13 for the slow-slow entry, so it
+      amplifies by ~10¹². On a fitted metric it produced c = 3.1e8 bits² —
+      valid arithmetic, meaningless geometry.
+    - Bisecting one global damping factor toward the diagonal. Feasible and
+      stable, but far too blunt: it crushed the authority-reach correlation
+      (which was never the problem) along with the irreversibility coupling
+      (which was), leaving M[a][h] = -0.007 and an essentially isotropic
+      geometry — throwing away exactly the structure docs/04 says carries the
+      escalation signal.
     """
     m = symmetrize(raw)
-    for _ in range(256):
-        m = spectral_map(m, lambda l: max(l, floor))
-        s = lyapunov(m, rates)
-        if min_eig(s) >= 0.0 and min_eig(m) >= floor:
-            break
-        m = lyapunov_inv(spectral_map(s, lambda l: max(l, 0.0)), rates)
-    return spectral_map(m, lambda l: max(l, floor))
+    m = spectral_map(m, lambda l: max(l, floor))
+
+    out = [[0.0] * N for _ in range(N)]
+    for i in range(N):
+        for j in range(N):
+            li, lj = rates[i], rates[j]
+            denom = li + lj
+            c = (2.0 * math.sqrt(li * lj) / denom) if denom > 0.0 else (1.0 if i == j else 0.0)
+            out[i][j] = m[i][j] * c
+
+    out = symmetrize(out)
+    if min_eig(out) < floor:
+        out = spectral_map(out, lambda l: max(l, floor))
+    return out
+
+
+def damping_matrix(rates):
+    """The C matrix above. Exposed so a deployment can see which axis pairs the
+    measured half-lives forbid from being correlated."""
+    return [
+        [
+            (2.0 * math.sqrt(rates[i] * rates[j]) / (rates[i] + rates[j]))
+            if rates[i] + rates[j] > 0.0
+            else (1.0 if i == j else 0.0)
+            for j in range(N)
+        ]
+        for i in range(N)
+    ]
 
 
 def is_feasible(m, rates):
