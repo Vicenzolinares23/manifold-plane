@@ -1,7 +1,8 @@
-"""HTTP gateway to manifold-planed (`POST /admit` agent domain)."""
+"""HTTP gateway to manifold-planed (Stage 8 ``/v1/decide`` or ``/admit``)."""
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -23,34 +24,38 @@ def decide(
     engine_url: str | None = None,
     timeout: float = 5.0,
 ) -> Verdict:
-    """POST ``/admit`` with an agent tool-call payload and return a typed Verdict.
-
-    ``at`` is accepted for Stage 8 call-site compatibility; the daemon stamps
-    decision time itself.
-    """
-    _ = at
+    """Prefer ``POST /v1/decide``; fall back to ``POST /admit``."""
     settings = get_settings()
     base = (engine_url or settings.engine_url).rstrip("/")
-    payload: dict[str, Any] = {
+    tool_body = {
+        "kind": tool_call.kind.value,
+        "payload_bytes": tool_call.payload_bytes,
+        "recipients": tool_call.recipients,
+        "argument_tainted": tool_call.argument_tainted,
+        "off_transcript": tool_call.off_transcript,
+        "source_sensitivity": tool_call.source_sensitivity,
+    }
+    v1_payload: dict[str, Any] = {
+        "asker_id": asker_id,
+        "symmetry_class": symmetry_class or settings.symmetry_class,
+        "tool_call": tool_body,
+        "at": float(at if at is not None else time.time()),
+    }
+    admit_payload: dict[str, Any] = {
         "asker": asker_id,
         "class": symmetry_class or settings.symmetry_class,
         "label": tool_call.name,
-        "agent": {
-            "kind": tool_call.kind.value,
-            "payload_bytes": tool_call.payload_bytes,
-            "recipients": tool_call.recipients,
-            "argument_tainted": tool_call.argument_tainted,
-            "off_transcript": tool_call.off_transcript,
-            "source_sensitivity": tool_call.source_sensitivity,
-        },
+        "agent": tool_body,
     }
     try:
         with httpx.Client(timeout=timeout) as client:
-            resp = client.post(f"{base}/admit", json=payload)
+            resp = client.post(f"{base}/v1/decide", json=v1_payload)
+            if resp.status_code == 404:
+                resp = client.post(f"{base}/admit", json=admit_payload)
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError as exc:
-        raise DaemonError(f"engine admit failed: {exc}") from exc
+        raise DaemonError(f"engine decide failed: {exc}") from exc
 
     return Verdict(
         decision=Decision(data["decision"]),
