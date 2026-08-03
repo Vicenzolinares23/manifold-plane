@@ -87,6 +87,19 @@ def gate_node(state: AgentState) -> AgentState:
     except DaemonError:
         verdict = heuristic_verdict(tool_call)
 
+    try:
+        from manifold_agent.db.persist import record_tool_event
+
+        record_tool_event(
+            asker_key=state.get("asker_id") or "agent",
+            thread_id=state.get("thread_id") or f"thread-{state.get('asker_id') or 'agent'}",
+            tool_call=tool_call,
+            verdict=verdict,
+            symmetry_class=state.get("symmetry_class") or "default",
+        )
+    except Exception:
+        pass
+
     route: Literal["tools", "replan", "hold", "end"]
     if verdict.decision == Decision.ADMIT:
         route = "tools"
