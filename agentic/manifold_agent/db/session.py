@@ -1,38 +1,43 @@
-"""Session factory for the agentic Postgres store."""
+"""Session factory and helpers for the agentic Postgres layer."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from manifold_agent.db.engine import create_engine_from_env
 
-_session_factory: sessionmaker[Session] | None = None
+_engine: Engine | None = None
+
+SessionLocal = sessionmaker(autoflush=False, autocommit=False, expire_on_commit=False)
 
 
-def configure_session(url: str | None = None) -> sessionmaker[Session]:
-    """Bind a process-wide session factory to an engine."""
-    global _session_factory
-    eng = create_engine_from_env(url)
-    _session_factory = sessionmaker(bind=eng, autoflush=False, autocommit=False, expire_on_commit=False, future=True)
-    return _session_factory
+def configure_session(engine: Engine | None = None) -> Engine:
+    """Bind ``SessionLocal`` to *engine* (or one from env). Idempotent."""
+    global _engine
+    if engine is None:
+        if _engine is None:
+            _engine = create_engine_from_env()
+        engine = _engine
+    else:
+        _engine = engine
+    SessionLocal.configure(bind=engine)
+    return engine
 
 
-def SessionLocal() -> Session:
-    """Create a new Session (configures from env on first use)."""
-    global _session_factory
-    if _session_factory is None:
-        configure_session()
-    assert _session_factory is not None
-    return _session_factory()
+def get_session() -> Session:
+    """Return a new session bound to the env engine (configures on first use)."""
+    configure_session()
+    return SessionLocal()
 
 
 @contextmanager
-def get_session() -> Iterator[Session]:
-    """Yield a short-lived session; commits on success, rolls back on error."""
-    session = SessionLocal()
+def session_scope() -> Iterator[Session]:
+    """Provide a transactional scope around a series of operations."""
+    session = get_session()
     try:
         yield session
         session.commit()
