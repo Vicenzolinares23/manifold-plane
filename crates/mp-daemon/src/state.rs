@@ -236,8 +236,75 @@ pub fn route(s: &Shared, req: Request) -> Response {
         ("GET", "/metrics") => Response::text(200, metrics(s)),
         ("GET", "/state") => state_dump(s),
         ("POST", "/admit") => admit(s, &req.body),
+        // Stage 8 agentic contract (`docs/08` §8.3) — thin shim over /admit.
+        ("POST", "/v1/decide") => decide_v1(s, &req.body),
+        ("GET", "/v1/config") => config_v1(s),
         _ => Response::not_found(),
     }
+}
+
+/// Stage 8 wire format for agent tool-call admission.
+#[derive(Debug, Deserialize)]
+struct DecideV1Body {
+    asker_id: String,
+    #[serde(default = "default_class")]
+    symmetry_class: String,
+    tool_call: AgentBody,
+    #[serde(default)]
+    at: Option<f64>,
+}
+
+fn default_class() -> String {
+    "default".into()
+}
+
+fn decide_v1(s: &Shared, body: &[u8]) -> Response {
+    let parsed: DecideV1Body = match serde_json::from_slice(body) {
+        Ok(b) => b,
+        Err(e) => {
+            s.counters.errors.fetch_add(1, Ordering::Relaxed);
+            return Response::json(
+                400,
+                serde_json::json!({ "error": format!("bad request: {e}") }).to_string(),
+            );
+        }
+    };
+    let _ = parsed.at;
+    let tc = &parsed.tool_call;
+    let wire = serde_json::json!({
+        "asker": parsed.asker_id,
+        "class": parsed.symmetry_class,
+        "label": tc.kind,
+        "agent": {
+            "kind": tc.kind,
+            "payload_bytes": tc.payload_bytes,
+            "recipients": tc.recipients,
+            "argument_tainted": tc.argument_tainted,
+            "off_transcript": tc.off_transcript,
+            "source_sensitivity": tc.source_sensitivity,
+        }
+    });
+    admit(s, wire.to_string().as_bytes())
+}
+
+fn config_v1(s: &Shared) -> Response {
+    Response::json(
+        200,
+        serde_json::json!({
+            "barrier": {
+                "alpha": s.cfg.alpha(),
+                "budget": s.cfg.budget_bits_squared,
+                "review_band": s.cfg.review_band,
+                "denial_weight_bits": s.cfg.denial_weight_bits,
+            },
+            "engine": {
+                "kappa_min": s.cfg.kappa_min_bits,
+                "max_coalition": s.cfg.max_coalition,
+                "idle_evict_secs": s.cfg.idle_evict_secs,
+            }
+        })
+        .to_string(),
+    )
 }
 
 fn admit(s: &Shared, body: &[u8]) -> Response {
@@ -504,6 +571,22 @@ mod tests {
                 body: body.into(),
             },
         )
+    }
+
+    #[test]
+    fn stage8_v1_decide_admits_a_benign_agent_read() {
+        let s = shared(Domain::Agent);
+        let r = route(
+            &s,
+            Request {
+                method: "POST".into(),
+                path: "/v1/decide".into(),
+                body: br#"{"asker_id":"agent-1","symmetry_class":"default","tool_call":{"kind":"ReadLocal","payload_bytes":32},"at":1.0}"#.to_vec(),
+            },
+        );
+        assert_eq!(r.status, 200);
+        let body = String::from_utf8(r.body).unwrap();
+        assert!(body.contains("\"decision\":\"admit\""), "{body}");
     }
 
     #[test]

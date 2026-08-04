@@ -7,7 +7,14 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
 sim/out/
+.env
+*.log
+# fine-tuned artifacts are reproducible, not stored
+agentic/models/
 *.png
 !docs/img/*.png
 .DS_Store
+
+.worktrees/

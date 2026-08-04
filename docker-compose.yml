@@ -1,0 +1,54 @@
+# manifold-plane agentic stack: Postgres + engine daemon + agent.
+#
+#   docker compose up -d postgres engine
+#   docker compose up agent
+#
+# Engine image is the repo-root Dockerfile (manifold-planed). Agent talks to
+# Postgres and the engine; Ollama is expected on the host at :11434.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: manifold
+      POSTGRES_PASSWORD: manifold
+      POSTGRES_DB: manifold_plane
+    ports:
+      - "5433:5432"
+    volumes:
+      - manifold_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manifold -d manifold_plane"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./deploy/config.dev.json:/etc/manifold-plane/config.json:ro
+    command: ["--config", "/etc/manifold-plane/config.json"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+    environment:
+      MP_ENGINE_URL: "http://engine:8787"
+      MP_DATABASE_URL: "postgresql+psycopg://manifold:manifold@postgres:5432/manifold_plane"
+      MP_LLM_BASE_URL: "http://host.docker.internal:11434/v1"
+      MP_LLM_MODEL: "phi4:14b"
+    depends_on:
+      engine:
+        condition: service_started
+    command: ["python", "-m", "manifold_agent.examples.demo_agent"]
+
+volumes:
+  manifold_pgdata:

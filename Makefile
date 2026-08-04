@@ -40,3 +40,27 @@ clean:
 	rm -rf sim/__pycache__
 
 all: check
+
+# Agentic layer (Python / Stage 8)
+.PHONY: db-up db-down db-migrate py-test agent-demo train eval
+
+db-up:
+	docker compose up -d postgres
+
+db-down:
+	docker compose down
+
+db-migrate:
+	cd agentic && alembic upgrade head
+
+py-test:
+	cd agentic && python -m pytest
+
+agent-demo:
+	cd agentic && python -m manifold_agent.examples.demo_agent
+
+train:
+	cd agentic && python -m manifold_agent.training.train --dry-run
+
+eval:
+	cd agentic && python -m manifold_agent.training.eval

@@ -18,6 +18,7 @@ crates/mp-adapters  Kubernetes / ICS / agent → displacement in bits
 crates/mp-daemon    manifold-planed
 crates/mp-operator  ManifoldPolicy reconciliation
 sim/                independent reimplementation used to check crates/
+agentic/            LangGraph agent, tools, memory, guardrails, Postgres
 ```
 
 ## The defect
@@ -188,3 +189,17 @@ Both are in the commit history with the measurements that exposed them.
 ## License
 
 MIT.
+
+
+## Agentic layer
+
+LangGraph tools are gated by `manifold-planed` before they execute. Long-term
+memory and every decision persist to Postgres. Guardrails plus a small
+fine-tune pipeline cover the measurement layer (`docs/08`).
+
+```sh
+make db-up
+make db-migrate
+make py-test
+make agent-demo
+```

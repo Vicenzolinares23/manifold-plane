@@ -221,6 +221,25 @@ impl Engine {
         }
     }
 
+    /// Seed or replace an asker's carried state (Postgres restore / restart).
+    pub fn upsert_asker(&mut self, state: AskerState) {
+        self.states.insert(state.id.clone(), state);
+    }
+
+    /// All asker states currently held by the engine.
+    pub fn askers(&self) -> impl Iterator<Item = &AskerState> {
+        self.states.values()
+    }
+
+    /// Replace the barrier (after recalibration).
+    pub fn set_barrier(&mut self, barrier: Barrier) {
+        self.barrier = barrier;
+    }
+
+    pub fn config(&self) -> &EngineConfig {
+        &self.cfg
+    }
+
     /// Drop askers idle longer than `idle_evict_secs`.
     pub fn evict_idle(&mut self, now: f64) -> usize {
         let cutoff = self.cfg.idle_evict_secs;

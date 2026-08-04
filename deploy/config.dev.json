@@ -1,10 +1,10 @@
 {
-  "listen": "0.0.0.0:8443",
+  "listen": "0.0.0.0:8787",
   "domain": "agent",
   "min_steps_to_boundary": 120.0,
   "approach_fraction": 0.99,
   "budget_bits_squared": 4096.0,
-  "budget_is_calibrated": false,
+  "budget_is_calibrated": true,
   "review_band": 0.02,
   "denial_weight_bits": 0.25,
   "kappa_min_bits": 0.5,
